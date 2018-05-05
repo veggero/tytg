@@ -1,7 +1,11 @@
+"""
+Announces a message to all the users.
+"""
+
 import os
 
 
-admins = (117923686, 445688752, 257986013)
+ADMINS = (123456789, 13374242)
 USERS_DIR = 'users/'
 ERROR_MSSG = 'This command is only for admins.'
 
@@ -17,7 +21,7 @@ def announce(bot, update) -> bool:
     :return: True if all succeeded, False if not
     :rtype: bool
     """
-    if update.message.chat_id not in admins:
+    if update.message.chat_id not in ADMINS:
         update.message.reply_text('This command is only for admins.')
         return
     try:
@@ -40,12 +44,11 @@ def announce(bot, update) -> bool:
                         parse_mode='HTML')
             except FileNotFoundError:
                 print('Announcement: %s%s not found' % (USERS_DIR, username))
-            except Exception as e:
-                print('Announcement: ' + str(e) + ' for %s' % username)
+            except BaseException as exception:
+                print('Announcement: ' + str(exception) + ' for %s' % username)
             finally:
                 print('Announcement: %s noticed' % username)
         print('Announcement: all succeeded')
-        return True
-    except Exception as e:
-        print('Announcement: failed due to ' + str(e))
-        return False
+    except BaseException as exception:
+        print('Announcement: failed due to ' + str(exception))
+    return

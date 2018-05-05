@@ -1,9 +1,13 @@
+"""
+Main module of TyTg. It starts the bot.
+"""
+
 import logging
-import telegram.ext
 from os.path import join
 from os import listdir
+from user import User
+import telegram.ext
 from modules.announce import announce
-from User import User
 
 
 PARENT_DIRECTORY = 'main/'
@@ -16,28 +20,36 @@ logging.basicConfig(
     level=logging.INFO)
 
 
-def manage_request(bot, update):
-    if update.channel_post: return reply(bot, update) 
-    username = (update.message.from_user.username if 
+def manage_request(_, update):
+    """
+    Manage a telegram request, creating the User and getting the directory.
+    """
+    username = (update.message.from_user.username if
                 update.message.from_user.username else str(update.message.chat_id))
     if not username + '.user' in listdir(USERS_DIR):
-        user = User(PARENT_DIRECTORY, username, {}, update.message.chat_id)
-    else: user = User.load_file('%s%s.user' % (USERS_DIR, username))
+        user = User(PARENT_DIRECTORY, username=username, downloads={}, tg_id=update.message.chat_id)
+    else:
+        user = User.load_file('%s%s.user' % (USERS_DIR, username))
     if 'script.py' in user.ls() and update.message.text != 'Indietro':
         global_vars = {}
-        with open(join(user.directory, "script.py")) as f:
-            exec(f.read(), global_vars)
+        with open(join(user.directory, "script.py")) as script:
+            exec(script.read(), global_vars)
         return global_vars['_main'](update.message.text, user)
-    user.get(update.message.text)
+    return user.get(update.message.text)
 
 
-updater = telegram.ext.Updater(token=TOKEN)
+def main():
+    """
+    Main function. Add the updater
+    """
+    updater = telegram.ext.Updater(token=TOKEN)
 
+    list(map(updater.dispatcher.add_handler, (
+        telegram.ext.CommandHandler('announce', announce),
+        telegram.ext.MessageHandler(
+            telegram.ext.Filters.all, manage_request))))
 
-[*map(updater.dispatcher.add_handler, (
-    telegram.ext.CommandHandler('announce', announce),
-    telegram.ext.MessageHandler(
-     telegram.ext.Filters.all, manage_request)))]
-    
-    
-updater.start_polling()
+    updater.start_polling()
+
+if __name__ == "__main__":
+    main()

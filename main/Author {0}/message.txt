@@ -1,0 +1,2 @@
+TyTg is made by @veggero. You can check him out on <a href='github.com/veggero'>github</a>.
+His main project is Nylo, a new declarative programming language.

@@ -8,7 +8,7 @@ from User import User
 
 PARENT_DIRECTORY = 'main/'
 USERS_DIR = 'users/'
-TOKEN = '459073331:AAH5amVnuD2g8Amw779T73DfP2jzx4-Pb2E'
+TOKEN = 'insert a valid token here'
 
 
 logging.basicConfig(

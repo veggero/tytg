@@ -7,7 +7,7 @@ import telegram
 
 # TODO: Move into a configuration file
 
-TOKEN = '459073331:AAH5amVnuD2g8Amw779T73DfP2jzx4-Pb2E'
+TOKEN = 'insert a valid token here'
 BACK_LABEL = 'Back'
 USERS_DIR = 'users/'
 STATS_FILE = 'stats/downloads.txt'

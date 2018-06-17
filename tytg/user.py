@@ -1,4 +1,4 @@
-"""
+"""gli dici a pipenv di cacarti un requirements file
 This module defines the User class. It manages user requests, loads data from file, saves,
 and send messages to the telegram user.
 """
@@ -10,7 +10,7 @@ from telegram import ReplyKeyboardMarkup as RKM
 import telegram
 
 
-TOKEN = 'insert token here'
+TOKEN = '459073331:AAFXSK91rmLEe3ZKZUS3PMp4TQ8yvpJPf4k'
 BACK_LABEL = 'Back'
 USERS_DIR = 'users/'
 STATS_FILE = 'stats/downloads.txt'
@@ -92,8 +92,7 @@ class User:
         """
         bot = telegram.Bot(TOKEN)
         back = [BACK_LABEL] if (self.directory != 'main') else []
-        data = {'reply_markup': [d
-                                 for d in back + self.ls(files=False)],
+        data = {'reply_markup': [d for d in back + self.ls(files=False)],
                 'chat_tg_id': self.tg_id, 'parse_mode': 'html'}
         data['reply_markup'] = RKM(
             [data['reply_markup'][i::KEYS] for i in range(KEYS)])
@@ -117,9 +116,6 @@ class User:
         Logs what the user has downloaded.
         """
         document = document.replace(': ', ' - ')
-        if document not in self.downloads:
-            self.downloads[document] = 0
-        self.downloads[document] += 1
         call(['touch', STATS_FILE])
         with open(STATS_FILE, 'r') as logfile:
             downloads = {line.split(': ')[0]: int(line.split(': ')[1])
@@ -128,6 +124,9 @@ class User:
         if document not in downloads:
             downloads[document] = 0
         downloads[document] += 1
+        if document not in self.downloads:
+            self.downloads[document] = 0
+        self.downloads[document] += 1
         with open(STATS_FILE, 'w') as logfile:
             logfile.write('\n'.join([
                 '%s: %s' % (key, downloads[key])

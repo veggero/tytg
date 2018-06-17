@@ -12,7 +12,7 @@ from modules.announce import announce
 
 PARENT_DIRECTORY = 'main/'
 USERS_DIR = 'users/'
-TOKEN = 'insert token here'
+TOKEN = '459073331:AAFXSK91rmLEe3ZKZUS3PMp4TQ8yvpJPf4k'
 
 
 logging.basicConfig(

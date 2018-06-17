@@ -26,6 +26,6 @@ Just look into the "main" folder:
 
 This will become:
 
-![](https://raw.githubusercontent.com/veggero/tytg/master/gh-files/example.png) 
+![](https://raw.githubusercontent.com/veggero/tytg/master/tytg/meta/example.png) 
 
 Not a single line of code is needed.

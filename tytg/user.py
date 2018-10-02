@@ -1,4 +1,4 @@
-"""gli dici a pipenv di cacarti un requirements file
+"""
 This module defines the User class. It manages user requests, loads data from file, saves,
 and send messages to the telegram user.
 """

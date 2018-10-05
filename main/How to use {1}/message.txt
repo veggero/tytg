@@ -1,1 +1,0 @@
-Just clone the repo at <code>https://github.com/veggero/tytg.git</code>

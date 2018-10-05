@@ -24,7 +24,7 @@ class User:
 		If so, read the data.
 		Otherwise, create a new file with data.
 		"""
-		self.file_path = os.path.join(ROOT, f'.{user.id}.user')
+		self.file_path = os.path.join(args['root'], f'.{user.id}.user')
 		if os.path.exists(self.file_path):
 			# Read the json data from the file.
 			with open(self.file_path, 'r') as file:
@@ -32,7 +32,8 @@ class User:
 		else:
 			# Write data about user to the file.
 			# root is the standard directory for new users.
-			self.data = {'id': user.id, 'username': user.username, 'path': ROOT}
+			self.data = {'id': user.id, 'username': user.username, 
+				'path': args['root']}
 			self.save_data()
 				
 	def save_data(self):
@@ -56,7 +57,7 @@ class User:
 		# ends with {*} exists, and if so, replaces path.
 		if glob(path+' {*}/'):
 			path = glob(path+' {*}')[0]
-		if directory == BACK_LABEL and self.data['path']!=ROOT:
+		if directory == args['back_label'] and self.data['path']!=args['root']:
 			# The first element of os.path.split is the .. directory
 			self.data['path'] = os.path.split(self.data['path'])[0]
 		# If file is a directoy, open it
@@ -71,7 +72,8 @@ class User:
 		current directory.
 		"""
 		# Put a back button if not in root
-		back = [[KB(BACK_LABEL)]] if self.data['path'] != ROOT else []
+		back = ([[KB(args['back_label'])]] 
+		  if self.data['path'] != args['root'] else [])
 		directories = smartsort(next(os.walk(self.data['path']))[1])
 		keyboard = RKM([[KB(dir)] for dir in directories]+back)
 		# All messages should be sent to this id, and with a keyboard
@@ -147,20 +149,34 @@ if __name__ == '__main__':
 	# Getting root and token from argument in a very verbose way.
 	parser = argparse.ArgumentParser(description='Run the tytg server.')
 	parser.add_argument('root', help='The path to the root folder.')
-	parser.add_argument('token', help='The bot token given by botfather.')
+	parser.add_argument('token', help='The bot token given by botfather.',
+					 default=None, nargs='?')
 	parser.add_argument('--back-label', metavar='TEXT', dest='back_label', 
 		default='Back', 
 		help='Il messaggio presente nel bottone che rappresenta la directory ..')
-	args = parser.parse_args()
-	ROOT = os.path.normpath(args.root)
-	TOKEN = args.token
-	BACK_LABEL = args.back_label
+	args = vars(parser.parse_args())
+	
+	# Load data from .args file inside main/
+	if os.path.exists(os.path.join(args['root'], '.args.json')):
+		with open(os.path.join(args['root'], '.args.json')) as file:
+			newargs = json.loads(file.read())
+		args.update(newargs)
+		
+	# No token, no party
+	if not args['token']:
+		print("A token is needed to run the bot. Get one from @botfather.")
+		print("Either insert the token as an argument after main/, or")
+		print("create a file called .args.json, containing:")
+		print("{'token': 'TOKEN HERE'}")
+		exit(1)
 	
 	# Get the updater using te token, and set up the message handler,
 	# in a quite verbose way.
-	updater = telegram.ext.Updater(token=TOKEN)
+	updater = telegram.ext.Updater(token=args['token'])
 	updater.dispatcher.add_handler(telegram.ext.MessageHandler(
 		telegram.ext.Filters.all, on_message))
 	
 	# Actually start the bot.
 	updater.start_polling()
+	
+	print("Bot started.")

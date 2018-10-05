@@ -91,7 +91,7 @@ class User:
 				bot.send_message(text=open(filepath, 'r').read(), 
 					 parse_mode='HTML', **pars)
 			# If file is in .png, .jpg, .bmp send the image
-			elif filepath[:-4] in ('.jpg', '.png', 'bmp'):
+			elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
 				bot.send_photo(photo=open(filepath, 'rb'), **pars)
 			# If file is a .mp4 send it as video
 			elif filepath.endswith('.mp4'):

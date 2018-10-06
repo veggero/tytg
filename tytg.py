@@ -83,7 +83,7 @@ class User:
 			'reply_markup': keyboard}
 		# Quanti file NON abbiamo spedito, perché non riconosciuti?
 		not_sent = 0
-		for filepath in os.listdir(self.data['path'])[:args['max-files']]:
+		for filepath in os.listdir(self.data['path']):
 			try:
 				# Avoid hidden file
 				if filepath.startswith('.'):
@@ -176,9 +176,6 @@ if __name__ == '__main__':
 	parser.add_argument('--standard-message', metavar='TEXT', dest='standard-message', 
 		default='Choose one:', 
 		help='Standard message if no file is found in a directory')
-	parser.add_argument('--max-files', metavar='TEXT', dest='max-files', 
-		default=5, type=int, 
-		help='Max number of files sent for every answer')
 	args = vars(parser.parse_args())
 	
 	# Load data from .args file inside main/

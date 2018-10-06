@@ -34,8 +34,12 @@ And:
 
 Setting up is quite easy:
 
-	python tytg.py main/ TOKEN
+	python -m tytg main/ TOKEN
 	
-After the first time, the TOKEN will be saved, toghether with all the arguments, to a .data.json file inside main/, making it unnecessary:
+After the first time, the token will be saved, toghether with all the arguments, to a .data.json file inside main/, making it unnecessary:
 
-	python tytg.py main/
+	python -m tytg main/
+	
+If you're using the tytg.py file instead of installing with pip, you can use:
+
+	python tytg.py main/ [TOKEN]

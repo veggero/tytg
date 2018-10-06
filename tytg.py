@@ -5,6 +5,7 @@ The main tytg module.
 import argparse
 import logging
 import telegram.ext
+import time
 import os
 import os.path
 import json
@@ -80,63 +81,81 @@ class User:
 		# with a list of one element: a list of directories.
 		pars = {'chat_id': self.data['id'],
 			'reply_markup': keyboard}
-		for filepath in os.listdir(self.data['path']):
-			# Avoid hidden file
-			if filepath.startswith('.'):
-				continue
-			filepath = os.path.join(self.data['path'], filepath)
-			# If file is a .txt, send the content
-			if filepath.endswith('.txt'):
-				bot.send_message(text=open(filepath, 'r').read(), **pars)
-			# If file is a .html, send the content as html
-			elif filepath.endswith('.html'):
-				bot.send_message(text=open(filepath, 'r').read(), 
-					 parse_mode='HTML', **pars)
-			# If file is in .png, .jpg, .bmp send the image
-			elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
-				bot.send_photo(photo=open(filepath, 'rb'), **pars)
-			# If file is a .mp4 send it as video
-			elif filepath.endswith('.mp4'):
-				bot.send_video(video=open(filepath, 'rb'), **pars)
-			# If file is a .mp3 send it as audio
-			elif filepath.endswith('.mp3'):
-				bot.send_voice(voice=open(filepath, 'rb'), **pars)
-			# If file is a .gif, send it as file (it will display as a gif)
-			elif filepath.endswith('.gif'):
-				bot.send_document(document=open(filepath, 'rb'), **pars)
-			# If file is a .tgfile, it contains the telegram file id:
-			elif filepath.endswith('.tgfile'):
-				bot.send_document(document=open(filepath, 'r').read(), **pars)
+		# Quanti file NON abbiamo spedito, perché non riconosciuti?
+		not_sent = 0
+		for filepath in os.listdir(self.data['path'])[:args['max-files']]:
+			try:
+				# Avoid hidden file
+				if filepath.startswith('.'):
+					not_sent += 1
+					continue
+				filepath = os.path.join(self.data['path'], filepath)
+				# If file is a .txt, send the content
+				if filepath.endswith('.txt'):
+					bot.send_message(text=open(filepath, 'r', 
+								encoding="UTF-8").read(), **pars)
+				# If file is a .html, send the content as html
+				elif filepath.endswith('.html'):
+					bot.send_message(text=open(filepath, 'r',
+								encoding="UTF-8").read(), 
+						parse_mode='HTML', **pars)
+				# If file is in .png, .jpg, .bmp send the image
+				elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
+					bot.send_photo(photo=open(filepath, 'rb'), **pars)
+				# If file is a .mp4 send it as video
+				elif filepath.endswith('.mp4'):
+					bot.send_video(video=open(filepath, 'rb'), **pars)
+				# If file is a .mp3 send it as audio
+				elif filepath.endswith('.mp3'):
+					bot.send_voice(voice=open(filepath, 'rb'), **pars)
+				# If file is a .gif, send it as file (it will display as a gif)
+				elif filepath.endswith('.gif'):
+					bot.send_document(document=open(filepath, 'rb'), **pars)
+				# If file is a .tgfile, it contains the telegram file id:
+				elif filepath.endswith('.tgfile'):
+					bot.send_document(document=open(filepath, 'r').read(), **pars)
+				else:
+					not_sent += 1
+			except Exception as e:
+				print(f"File upload failed due to {e}")
+				not_sent += 1
+		if min(len(os.listdir(self.data['path'])), args['max-files']) == not_sent:
+			# No file has been sent. Standard message here.
+			bot.send_message(text=args['standard-message'], **pars)
 				
 
 def smartsort(buttons):
-    """
-    Sort a list of buttons. It will check for:
-    - Alphabetical order (a, b, c)
-    - Numeric order (1, 2, 3)
-    - Specified order (b {0}, c {1}, a {2})
-    """
-    numbers, specified, words = [], [], []
-    for button in buttons:
-        if button.split(' ')[-1].isdigit():
-            numbers.append(button)
-        elif '{' in button:
-            specified.append(button)
-        else:
-            words.append(button)
-    numbers.sort(key=lambda x: int(x.split(' ')[-1]))
-    specified.sort(key=lambda x: int(x[x.index('{') + 1:x.index('}')]))
-    specified = [word[:word.index('{')-1] for word in specified]
-    words.sort()
-    return specified + numbers + words
+	"""
+	Sort a list of buttons. It will check for:
+	- Alphabetical order (a, b, c)
+	- Numeric order (1, 2, 3)
+	- Specified order (b {0}, c {1}, a {2})
+	"""
+	numbers, specified, words = [], [], []
+	for button in buttons:
+		if button.startswith('.'):
+			continue
+		if button.split(' ')[-1].isdigit():
+			numbers.append(button)
+		elif '{' in button:
+			specified.append(button)
+		else:
+			words.append(button)
+	numbers.sort(key=lambda x: int(x.split(' ')[-1]))
+	specified.sort(key=lambda x: int(x[x.index('{') + 1:x.index('}')]))
+	specified = [word[:word.index('{')-1] for word in specified]
+	words.sort()
+	return specified + numbers + words
 
 
 def on_message(bot, update):
 	"""
 	Answer to a message sent to the bot.
 	"""
+	print("Message received")
 	user = User(update.message.from_user)
 	user.cd(update.message.text, bot)
+	print("Message handled")
 
 
 if __name__ == '__main__':
@@ -153,14 +172,23 @@ if __name__ == '__main__':
 					 default=None, nargs='?')
 	parser.add_argument('--back-label', metavar='TEXT', dest='back_label', 
 		default='Back', 
-		help='Il messaggio presente nel bottone che rappresenta la directory ..')
+		help='Text in the button representing ..')
+	parser.add_argument('--standard-message', metavar='TEXT', dest='standard-message', 
+		default='Choose one:', 
+		help='Standard message if no file is found in a directory')
+	parser.add_argument('--max-files', metavar='TEXT', dest='max-files', 
+		default=5, type=int, 
+		help='Max number of files sent for every answer')
 	args = vars(parser.parse_args())
 	
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
-		with open(os.path.join(args['root'], '.args.json')) as file:
-			newargs = json.loads(file.read())
-		args.update(newargs)
+		with open(os.path.join(args['root'], '.args.json'), 'r') as file:
+			args.update(json.loads(file.read()))
+			
+	# Save data to file, in order to avoid putting token every time
+	with open(os.path.join(args['root'], '.args.json'), 'w') as file:
+		json.dump(args, file)
 		
 	# No token, no party
 	if not args['token']:

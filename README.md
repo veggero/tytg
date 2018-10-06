@@ -36,4 +36,6 @@ Setting up is quite easy:
 
 	python tytg.py main/ TOKEN
 	
-There's no need to code.
+After the first time, the TOKEN will be saved, toghether with all the arguments, to a .data.json file inside main/, making it unnecessary:
+
+	python tytg.py main/

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='tytg',
-      version='0.2.1',
+      version='0.2.2',
       description='Telegram bot making without any line of code.',
       url='http://github.com/veggero/tytg',
       author='veggero',

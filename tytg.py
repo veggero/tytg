@@ -1,6 +1,6 @@
-"""
+("""
 The main tytg module.
-"""
+""" "suca") 
 
 import argparse
 import logging
@@ -9,6 +9,8 @@ import time
 import os
 import os.path
 import json
+import ast
+import subprocess
 from glob import glob
 from telegram import ReplyKeyboardMarkup as RKM
 from telegram import KeyboardButton as KB
@@ -25,17 +27,21 @@ class User:
 		If so, read the data.
 		Otherwise, create a new file with data.
 		"""
+		# start with standard values
+		# mess_to_file is a map from a message to the filename
+		# that contains that content
+		self.data = {'id': user.id, 'username': user.username, 
+			'path': args['root'], 'mess_to_file': {}}
 		self.file_path = os.path.join(args['root'], f'.{user.id}.user')
 		if os.path.exists(self.file_path):
 			# Read the json data from the file.
 			with open(self.file_path, 'r') as file:
-				self.data = json.loads(file.read())
+				# Update with data from the file
+				self.data.update(json.loads(file.read()))
 		else:
-			# Write data about user to the file.
-			# root is the standard directory for new users.
-			self.data = {'id': user.id, 'username': user.username, 
-				'path': args['root']}
-			self.save_data()
+			self.data = {}
+		# Write data about user to the file.
+		self.save_data()
 				
 	def save_data(self):
 		"""
@@ -58,7 +64,8 @@ class User:
 		# ends with {*} exists, and if so, replaces path.
 		if glob(path+' {*}/'):
 			path = glob(path+' {*}')[0]
-		if directory == args['back_label'] and self.data['path']!=args['root']:
+		if (directory == args['back_label'] and 
+			self.data['path']!=args['root']):
 			# The first element of os.path.split is the .. directory
 			self.data['path'] = os.path.split(self.data['path'])[0]
 		# If file is a directoy, open it
@@ -90,39 +97,75 @@ class User:
 					not_sent += 1
 					continue
 				filepath = os.path.join(self.data['path'], filepath)
-				# If file is a .txt, send the content
-				if filepath.endswith('.txt'):
-					bot.send_message(text=open(filepath, 'r', 
-								encoding="UTF-8").read(), **pars)
-				# If file is a .html, send the content as html
-				elif filepath.endswith('.html'):
-					bot.send_message(text=open(filepath, 'r',
-								encoding="UTF-8").read(), 
-						parse_mode='HTML', **pars)
-				# If file is in .png, .jpg, .bmp send the image
-				elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
-					bot.send_photo(photo=open(filepath, 'rb'), **pars)
-				# If file is a .mp4 send it as video
-				elif filepath.endswith('.mp4'):
-					bot.send_video(video=open(filepath, 'rb'), **pars)
-				# If file is a .mp3 send it as audio
-				elif filepath.endswith('.mp3'):
-					bot.send_voice(voice=open(filepath, 'rb'), **pars)
-				# If file is a .gif, send it as file (it will display as a gif)
-				elif filepath.endswith('.gif'):
-					bot.send_document(document=open(filepath, 'rb'), **pars)
-				# If file is a .tgfile, it contains the telegram file id:
-				elif filepath.endswith('.tgfile'):
-					bot.send_document(document=open(filepath, 'r').read(), **pars)
-				else:
-					not_sent += 1
+				self.send(filepath, bot, pars)
 			except Exception as e:
 				print(f"File upload failed due to {e}")
 				not_sent += 1
-		if min(len(os.listdir(self.data['path'])), args['max-files']) == not_sent:
+		if len(os.listdir(self.data['path'])) == not_sent:
 			# No file has been sent. Standard message here.
 			bot.send_message(text=args['standard-message'], **pars)
+			
+	def send(self, filepath, bot, pars):
+		# If file is a .txt, send the content
+		if filepath.endswith('.txt'):
+			mess = open(filepath, 'r', encoding="UTF-8").read()
+			bot.send_message(text=mess, **pars)
+			self.data['mess_to_file'][mess] = filepath
+		# If file is a .html, send the content as html
+		elif filepath.endswith('.html'):
+			mess = text=open(filepath, 'r', encoding="UTF-8").read()
+			bot.send_message(text=mess, parse_mode='HTML', **pars)
+			self.data['mess_to_file'][mess] = filepath
+		# If file is in .png, .jpg, .bmp send the image
+		elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
+			bot.send_photo(photo=open(filepath, 'rb'), **pars)
+		# If file is a .mp4 send it as video
+		elif filepath.endswith('.mp4'):
+			bot.send_video(video=open(filepath, 'rb'), **pars)
+		# If file is a .mp3 send it as audio
+		elif filepath.endswith('.mp3'):
+			bot.send_voice(voice=open(filepath, 'rb'), **pars)
+		# If file is a .gif, send it as file (it will display as a gif)
+		elif filepath.endswith('.gif'):
+			bot.send_document(document=open(filepath, 'rb'), **pars)
+		# If file is a .tgfile, it contains the telegram file id:
+		elif filepath.endswith('.tgfile'):
+			bot.send_document(document=open(filepath, 'r').read(), **pars)
+		elif filepath.endswith('.py'):
+			mess = filepath.replace('.py', '')
+			code = open(filepath, 'r').read()
+			if get_docstring(code):
+				mess = get_docstring(code)
+			bot.send_message(text=mess, **pars)
+			self.data['mess_to_file'][mess] = filepath
+		else:
+			raise TypeError(f'Cannot send file {filepath} due to '
+				   'unknow extension')
+		
+	def call(self, message, args, update):
+		"""
+		Call a file with some arguments, e.g.
+		replying "-rf /" to the message sent
+		from the file "/bin/rm"
+		"""
+		if message.text not in self.data['mess_to_file']:
+			return
+		# Check to what file is the reply referring to
+		file = self.data['mess_to_file'][message.text]
+		# Call the python file, and write the output back
+		if file.endswith('.py'):
+			cmd = f'python3 "{file}" "{args.text}"'
+			out = subprocess.check_output(cmd, shell=True)
+			update.message.reply_text(out.decode(), parse_mode='HTML')
+		# Calls are not supported on this file. ignore
 				
+				
+def get_docstring(source):
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Module):
+            docstring = ast.get_docstring(node)
+            return docstring
+		
 
 def smartsort(buttons):
 	"""
@@ -154,7 +197,10 @@ def on_message(bot, update):
 	"""
 	print("Message received")
 	user = User(update.message.from_user)
-	user.cd(update.message.text, bot)
+	if update.message.reply_to_message:
+		user.call(update.message.reply_to_message, update.message, update)
+	else:
+		user.cd(update.message.text, bot)
 	print("Message handled")
 
 
@@ -173,8 +219,8 @@ if __name__ == '__main__':
 	parser.add_argument('--back-label', metavar='TEXT', dest='back_label', 
 		default='Back', 
 		help='Text in the button representing ..')
-	parser.add_argument('--standard-message', metavar='TEXT', dest='standard-message', 
-		default='Choose one:', 
+	parser.add_argument('--standard-message', metavar='TEXT', 
+		dest='standard-message', default='Choose one:', 
 		help='Standard message if no file is found in a directory')
 	args = vars(parser.parse_args())
 	

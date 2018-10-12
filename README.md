@@ -26,11 +26,11 @@ Just look into the "main" folder:
 
 This will become:
 
-![](https://raw.githubusercontent.com/veggero/tytg/master/tytg/meta/example.png) 
+![](https://raw.githubusercontent.com/veggero/tytg/master/meta/example.png) 
 
 And:
 
-![](https://raw.githubusercontent.com/veggero/tytg/master/tytg/meta/example2.png) 
+![](https://raw.githubusercontent.com/veggero/tytg/master/meta/example2.png) 
 
 Setting up is quite easy:
 

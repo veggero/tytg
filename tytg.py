@@ -1,6 +1,6 @@
-("""
+"""
 The main tytg module.
-""" "suca") 
+"""
 
 import argparse
 import logging
@@ -20,6 +20,9 @@ class User:
 	"""
 	This class represent an user that's using the bot.
 	"""
+	
+	extensions = ('.txt', '.html', '.jpg', '.png', '.bmp', '.mp4',
+				  '.mp3', '.gif', '.tgfile', '.py')
 	
 	def __init__(self, user):
 		"""
@@ -117,7 +120,7 @@ class User:
 			bot.send_message(text=mess, parse_mode='HTML', **pars)
 			self.data['mess_to_file'][mess] = filepath
 		# If file is in .png, .jpg, .bmp send the image
-		elif filepath[-4:] in ('.jpg', '.png', 'bmp'):
+		elif filepath[-4:] in ('.jpg', '.png', '.bmp'):
 			bot.send_photo(photo=open(filepath, 'rb'), **pars)
 		# If file is a .mp4 send it as video
 		elif filepath.endswith('.mp4'):
@@ -138,11 +141,13 @@ class User:
 				mess = get_docstring(code)
 			bot.send_message(text=mess, **pars)
 			self.data['mess_to_file'][mess] = filepath
+		elif filepath.endswith('/'):
+			pass
 		else:
 			raise TypeError(f'Cannot send file {filepath} due to '
 				   'unknow extension')
 		
-	def call(self, message, args, update):
+	def call(self, message, args, update, bot):
 		"""
 		Call a file with some arguments, e.g.
 		replying "-rf /" to the message sent
@@ -156,15 +161,28 @@ class User:
 		if file.endswith('.py'):
 			cmd = f'python3 "{file}" "{args.text}"'
 			out = subprocess.check_output(cmd, shell=True)
-			update.message.reply_text(out.decode(), parse_mode='HTML')
+			out = out.decode().split('\n')
+			for line in [*out]:
+				# If any line output is a filename, send it
+				if any(line.endswith(ext) for ext in self.extensions):
+					out.remove(line)
+					line = os.path.join(self.data['path'], line)
+					self.send(line, bot, {'chat_id': message.chat_id})
+				# If any line is a path, open it
+				elif line.endswith('/'):
+					out.remove(line)
+					self.cd(line, bot)
+			out = '\n'.join(out)
+			if out:
+				update.message.reply_text(out, parse_mode='HTML')
 		# Calls are not supported on this file. ignore
 				
 				
 def get_docstring(source):
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Module):
-            docstring = ast.get_docstring(node)
-            return docstring
+	for node in ast.walk(ast.parse(source)):
+		if isinstance(node, ast.Module):
+			docstring = ast.get_docstring(node)
+			return docstring
 		
 
 def smartsort(buttons):
@@ -198,7 +216,8 @@ def on_message(bot, update):
 	print("Message received")
 	user = User(update.message.from_user)
 	if update.message.reply_to_message:
-		user.call(update.message.reply_to_message, update.message, update)
+		user.call(update.message.reply_to_message, 
+			update.message, update, bot)
 	else:
 		user.cd(update.message.text, bot)
 	print("Message handled")
@@ -222,12 +241,15 @@ if __name__ == '__main__':
 	parser.add_argument('--standard-message', metavar='TEXT', 
 		dest='standard-message', default='Choose one:', 
 		help='Standard message if no file is found in a directory')
+	
 	args = vars(parser.parse_args())
 	
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
 		with open(os.path.join(args['root'], '.args.json'), 'r') as file:
-			args.update(json.loads(file.read()))
+			args = json.loads(file.read())
+	
+	args.update(vars(parser.parse_args()))
 			
 	# Save data to file, in order to avoid putting token every time
 	with open(os.path.join(args['root'], '.args.json'), 'w') as file:

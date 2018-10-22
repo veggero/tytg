@@ -141,7 +141,7 @@ class User:
 				mess = get_docstring(code)
 			bot.send_message(text=mess, **pars)
 			self.data['mess_to_file'][mess] = filepath
-		elif filepath.endswith('/'):
+		elif '.' not in filepath:
 			pass
 		else:
 			raise TypeError(f'Cannot send file {filepath} due to '
@@ -153,13 +153,13 @@ class User:
 		replying "-rf /" to the message sent
 		from the file "/bin/rm"
 		"""
-		if message.text not in self.data['mess_to_file']:
+		if message not in self.data['mess_to_file']:
 			return
 		# Check to what file is the reply referring to
-		file = self.data['mess_to_file'][message.text]
+		file = self.data['mess_to_file'][message]
 		# Call the python file, and write the output back
 		if file.endswith('.py'):
-			cmd = f'python3 "{file}" "{args.text}"'
+			cmd = f'python3 "{file}" "{args}"'
 			out = subprocess.check_output(cmd, shell=True)
 			out = out.decode().split('\n')
 			for line in [*out]:
@@ -167,7 +167,7 @@ class User:
 				if any(line.endswith(ext) for ext in self.extensions):
 					out.remove(line)
 					line = os.path.join(self.data['path'], line)
-					self.send(line, bot, {'chat_id': message.chat_id})
+					self.send(line, bot, {'chat_id': update.message.chat_id})
 				# If any line is a path, open it
 				elif line.endswith('/'):
 					out.remove(line)
@@ -176,6 +176,31 @@ class User:
 			if out:
 				update.message.reply_text(out, parse_mode='HTML')
 		# Calls are not supported on this file. ignore
+		
+		
+	def run_bin(self, message, update, bot):
+		"""
+		Search for a bin* directory in main/,
+		and call the command* file inside it with
+		the arguments.
+		Example could be: /rm .
+		Will search for main/bin*/rm*, and find
+		main/bin {-1}/rm.py, and call it with
+		argument .
+		"""
+		command, sep, arguments = message.partition(' ')
+		# remove the /
+		command = command[1:]
+		script = glob(f"{args['root']}/bin*/{command}*")
+		# No script found? That's the end.
+		if not script: 
+			return print(f"Command not recognized: {command}")
+		# Otherwise, get first result
+		script = script[0]
+		# Save the script name inside the 'mess_to_file' dictionary
+		# in order to make it recognizable to User.call
+		self.data['mess_to_file'][script] = script
+		self.call(script, arguments, update, bot)
 				
 				
 def get_docstring(source):
@@ -204,7 +229,8 @@ def smartsort(buttons):
 			words.append(button)
 	numbers.sort(key=lambda x: int(x.split(' ')[-1]))
 	specified.sort(key=lambda x: int(x[x.index('{') + 1:x.index('}')]))
-	specified = [word[:word.index('{')-1] for word in specified]
+	specified = [word[:word.index('{')-1] for word in specified
+			  if int(word[word.index('{') + 1:word.index('}')])>0]
 	words.sort()
 	return specified + numbers + words
 
@@ -215,10 +241,15 @@ def on_message(bot, update):
 	"""
 	print("Message received")
 	user = User(update.message.from_user)
-	if update.message.reply_to_message:
-		user.call(update.message.reply_to_message, 
-			update.message, update, bot)
+	if update.message.text.startswith('/'):
+		# Command, tell the user to execute it
+		user.run_bin(update.message.text, update, bot)
+	elif update.message.reply_to_message:
+		# It's a call to an older message
+		user.call(update.message.reply_to_message.text, 
+			update.message.text, update, bot)
 	else:
+		# What else? Just a directory name to open
 		user.cd(update.message.text, bot)
 	print("Message handled")
 
@@ -247,9 +278,13 @@ if __name__ == '__main__':
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
 		with open(os.path.join(args['root'], '.args.json'), 'r') as file:
-			args = json.loads(file.read())
+			args = json.load(file)
 	
-	args.update(vars(parser.parse_args()))
+	# Command line args should have priority over .args.data,
+	# but only if they're different from None
+	args.update({key: value for key, value in 
+			  vars(parser.parse_args()).items()
+			  if value})
 			
 	# Save data to file, in order to avoid putting token every time
 	with open(os.path.join(args['root'], '.args.json'), 'w') as file:

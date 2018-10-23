@@ -2,15 +2,10 @@
 The main tytg module.
 """
 
-import argparse
-import logging
 import telegram.ext
-import time
-import os
-import os.path
-import json
-import ast
-import subprocess
+import argparse, logging
+import os.path, subprocess
+import json, ast
 from glob import glob
 from telegram import ReplyKeyboardMarkup as RKM
 from telegram import KeyboardButton as KB
@@ -41,8 +36,6 @@ class User:
 			with open(self.file_path, 'r') as file:
 				# Update with data from the file
 				self.data.update(json.loads(file.read()))
-		else:
-			self.data = {}
 		# Write data about user to the file.
 		self.save_data()
 				
@@ -68,7 +61,7 @@ class User:
 		if glob(path+' {*}/'):
 			path = glob(path+' {*}')[0]
 		if (directory == args['back_label'] and 
-			self.data['path']!=args['root']):
+			self.data['path'] != args['root']):
 			# The first element of os.path.split is the .. directory
 			self.data['path'] = os.path.split(self.data['path'])[0]
 		# If file is a directoy, open it
@@ -83,28 +76,15 @@ class User:
 		current directory.
 		"""
 		# Put a back button if not in root
-		back = ([[KB(args['back_label'])]] 
-		  if self.data['path'] != args['root'] else [])
-		directories = smartsort(next(os.walk(self.data['path']))[1])
-		keyboard = RKM([[KB(dir)] for dir in directories]+back)
-		# All messages should be sent to this id, and with a keyboard
-		# with a list of one element: a list of directories.
-		pars = {'chat_id': self.data['id'],
-			'reply_markup': keyboard}
-		# Quanti file NON abbiamo spedito, perché non riconosciuti?
-		not_sent = 0
-		for filepath in os.listdir(self.data['path']):
-			try:
-				# Avoid hidden file
-				if filepath.startswith('.'):
-					not_sent += 1
-					continue
-				filepath = os.path.join(self.data['path'], filepath)
-				self.send(filepath, bot, pars)
-			except Exception as e:
-				print(f"File upload failed due to {e}")
-				not_sent += 1
-		if len(os.listdir(self.data['path'])) == not_sent:
+		back = [[KB(args['back_label'])] *
+		  (not os.path.samefile(self.data['path'], args['root']))]
+		dirs = smartsort(glob(self.data['path']+'/*/'))
+		keyboard = RKM([[KB(a)] for a in dirs] + back)
+		files = glob(self.data['path']+'/*.*')
+		for filepath in files:
+			self.send(filepath, bot, {'chat_id': self.data['id'],
+							          'reply_markup': keyboard})
+		if not files:
 			# No file has been sent. Standard message here.
 			bot.send_message(text=args['standard-message'], **pars)
 			
@@ -160,22 +140,24 @@ class User:
 		# Call the python file, and write the output back
 		if file.endswith('.py'):
 			cmd = f'python3 "{file}" "{args}"'
-			out = subprocess.check_output(cmd, shell=True)
-			out = out.decode().split('\n')
-			for line in [*out]:
-				# If any line output is a filename, send it
-				if any(line.endswith(ext) for ext in self.extensions):
-					out.remove(line)
-					line = os.path.join(self.data['path'], line)
-					self.send(line, bot, {'chat_id': update.message.chat_id})
-				# If any line is a path, open it
-				elif line.endswith('/'):
-					out.remove(line)
-					self.cd(line, bot)
+		else:
+			return self.send(file, bot, {'chat_id': update.message.chat_id})
+		out = subprocess.check_output(cmd, shell=True)
+		out = out.decode().split('\n')
+		for line in [*out]:
+			# If any line output is a filename, send it
+			if any(line.endswith(ext) for ext in self.extensions):
+				out.remove(line)
+				line = os.path.join(self.data['path'], line)
+				self.send(line, bot, {'chat_id': update.message.chat_id})
+			# If any line is a path, open it
+			elif line.endswith('/'):
+				out.remove(line)
+				self.cd(line, bot)
+		if out:
 			out = '\n'.join(out)
-			if out:
-				update.message.reply_text(out, parse_mode='HTML')
-		# Calls are not supported on this file. ignore
+			update.message.reply_text(out, parse_mode='HTML')
+	# Calls are not supported on this file. ignore
 		
 		
 	def run_bin(self, message, update, bot):
@@ -210,28 +192,36 @@ def get_docstring(source):
 			return docstring
 		
 
-def smartsort(buttons):
+def smartsort(names):
 	"""
-	Sort a list of buttons. It will check for:
+	Sort a list of names. It will check for:
 	- Alphabetical order (a, b, c)
 	- Numeric order (1, 2, 3)
 	- Specified order (b {0}, c {1}, a {2})
 	"""
+	
+	def curly(string):
+		"Extract the string inside the curly brackets."
+		return string[string.index('{')+1:string.index('}')]
+	
+	def isnum(string):
+		"Is this string a number?"
+		return string.replace('-', '', 1).isdigit()
+	
 	numbers, specified, words = [], [], []
-	for button in buttons:
-		if button.startswith('.'):
-			continue
-		if button.split(' ')[-1].isdigit():
-			numbers.append(button)
-		elif '{' in button:
-			specified.append(button)
+	for name in names:
+		*dir, name, end = name.split('/') 
+		if isnum(name.split(' ')[-1]):
+			numbers.append(name)
+		elif '{' in name and isnum(curly(name)):
+			specified.append(name)
 		else:
-			words.append(button)
+			words.append(name)
 	numbers.sort(key=lambda x: int(x.split(' ')[-1]))
-	specified.sort(key=lambda x: int(x[x.index('{') + 1:x.index('}')]))
+	specified.sort(key=lambda x: int(curly(x)))
+	words.sort();
 	specified = [word[:word.index('{')-1] for word in specified
-			  if int(word[word.index('{') + 1:word.index('}')])>0]
-	words.sort()
+			  if int(curly(word))>0]
 	return specified + numbers + words
 
 
@@ -241,15 +231,15 @@ def on_message(bot, update):
 	"""
 	print("Message received")
 	user = User(update.message.from_user)
+	# Command, tell the user to execute it
 	if update.message.text.startswith('/'):
-		# Command, tell the user to execute it
 		user.run_bin(update.message.text, update, bot)
+	# It's a call to an older message
 	elif update.message.reply_to_message:
-		# It's a call to an older message
 		user.call(update.message.reply_to_message.text, 
 			update.message.text, update, bot)
+	# What else? Just a directory name to open
 	else:
-		# What else? Just a directory name to open
 		user.cd(update.message.text, bot)
 	print("Message handled")
 
@@ -273,19 +263,21 @@ if __name__ == '__main__':
 		dest='standard-message', default='Choose one:', 
 		help='Standard message if no file is found in a directory')
 	
+	# Get all the specified values
 	args = vars(parser.parse_args())
+	token = {'token': args['token']}
 	
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
 		with open(os.path.join(args['root'], '.args.json'), 'r') as file:
-			args = json.load(file)
+			file_args = json.load(file)
 	
-	# Command line args should have priority over .args.data,
-	# but only if they're different from None
-	args.update({key: value for key, value in 
-			  vars(parser.parse_args()).items()
-			  if value})
-			
+	# Update the standard values with the file
+	args.update(file_args)
+	# The command line token has priority over .data.json
+	if token['token']:
+		args.update(token)
+	
 	# Save data to file, in order to avoid putting token every time
 	with open(os.path.join(args['root'], '.args.json'), 'w') as file:
 		json.dump(args, file)

@@ -267,6 +267,12 @@ if __name__ == '__main__':
 	args = vars(parser.parse_args())
 	token = {'token': args['token']}
 	
+	# Does root exist?
+	if not os.path.exists(args['root']):
+		print(f"{args['root']} does not exist!")
+		print("Please indicate an existing folder.")
+		exit(1)
+	
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
 		with open(os.path.join(args['root'], '.args.json'), 'r') as file:

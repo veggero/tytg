@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='tytg',
-      version='0.2.6.0',
+      version='0.2.6.2',
       description='Telegram bot making without any line of code.',
       url='http://github.com/veggero/tytg',
       author='veggero',
@@ -9,7 +9,7 @@ setup(name='tytg',
       license='unlicenced',
       packages=['tytg'],
       long_description=open('README.md', 'r').read(),
-	  long_description_content_type="text/markdown",
+	      long_description_content_type='text/markdown',
       install_requires=[
           'python-telegram-bot',
       ],

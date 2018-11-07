@@ -271,6 +271,8 @@ if __name__ == '__main__':
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
 		with open(os.path.join(args['root'], '.args.json'), 'r') as file:
 			file_args = json.load(file)
+	else:
+		file_args = {}
 	
 	# Update the standard values with the file
 	args.update(file_args)

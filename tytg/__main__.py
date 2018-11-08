@@ -80,10 +80,10 @@ class User:
 		  (not os.path.samefile(self.data['path'], args['root']))]
 		dirs = smartsort(glob(self.data['path']+'/*/'))
 		keyboard = RKM([[KB(a)] for a in dirs] + back)
-		files = glob(self.data['path']+'/*.*')
+		files = [*filter(os.path.isfile, glob(self.data['path']+'/*.*'))]
+		pars = {'chat_id': self.data['id'], 'reply_markup': keyboard}
 		for filepath in files:
-			self.send(filepath, bot, {'chat_id': self.data['id'],
-							          'reply_markup': keyboard})
+			self.send(filepath, bot, pars)
 		if not files:
 			# No file has been sent. Standard message here.
 			bot.send_message(text=args['standard-message'], **pars)
@@ -121,8 +121,6 @@ class User:
 				mess = get_docstring(code)
 			bot.send_message(text=mess, **pars)
 			self.data['mess_to_file'][mess] = filepath
-		elif '.' not in filepath:
-			pass
 		else:
 			raise TypeError(f'Cannot send file {filepath} due to '
 				   'unknow extension')

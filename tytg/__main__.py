@@ -255,21 +255,26 @@ if __name__ == '__main__':
 	parser.add_argument('token', help='The bot token given by botfather.',
 					 default=None, nargs='?')
 	parser.add_argument('--back-label', metavar='TEXT', dest='back_label', 
-		default='Back', 
+		default=None, 
 		help='Text in the button representing ..')
 	parser.add_argument('--standard-message', metavar='TEXT', 
-		dest='standard-message', default='Choose one:', 
+		dest='standard-message', default=None, 
 		help='Standard message if no file is found in a directory')
 	
 	# Get all the specified values
 	args = vars(parser.parse_args())
-	token = {'token': args['token']}
 	
 	# Does root exist?
 	if not os.path.exists(args['root']):
 		print(f"{args['root']} does not exist!")
 		print("Please indicate an existing folder.")
 		exit(1)
+		
+	# Create .args.json file with standard data if it doesn't exist
+	if not os.path.exists(os.path.join(args['root'], '.args.json')):
+		with open(os.path.join(args['root'], '.args.json'), 'w') as file:
+			json.dump({'back_label': 'Back',
+			  'standard-message': 'Choose one:'}, file)
 	
 	# Load data from .args file inside main/
 	if os.path.exists(os.path.join(args['root'], '.args.json')):
@@ -279,10 +284,10 @@ if __name__ == '__main__':
 		file_args = {}
 	
 	# Update the standard values with the file
-	args.update(file_args)
-	# The command line token has priority over .data.json
-	if token['token']:
-		args.update(token)
+	file_args.update({a: b for a,b in args.items() if b})
+	args = file_args
+	#args.update(file_args)
+		
 	
 	# Save data to file, in order to avoid putting token every time
 	with open(os.path.join(args['root'], '.args.json'), 'w') as file:

@@ -5,7 +5,7 @@ The main tytg module.
 import telegram.ext
 import argparse, logging
 import os, os.path, subprocess
-import json, ast
+import json, ast, random
 from glob import glob
 from telegram import ReplyKeyboardMarkup as RKM
 from telegram import KeyboardButton as KB
@@ -17,7 +17,7 @@ class User:
 	"""
 	
 	extensions = ('.txt', '.html', '.jpg', '.png', '.bmp', '.mp4',
-				  '.mp3', '.gif', '.tgfile', '.py')
+				  '.mp3', '.gif', '.tgfile', '.py', '.tgfile')
 	
 	def __init__(self, user):
 		"""
@@ -113,7 +113,19 @@ class User:
 			bot.send_document(document=open(filepath, 'rb'), **pars)
 		# If file is a .tgfile, it contains the telegram file id:
 		elif filepath.endswith('.tgfile'):
-			bot.send_document(document=open(filepath, 'r').read(), **pars)
+			ext, sep, file_id = open(filepath, 'r').read().partition('@')
+			if ext == 'document':
+				bot.send_document(document=file_id, **pars)
+			elif ext == 'audio':
+				bot.send_audio(audio=file_id, **pars)
+			elif ext == 'photo':
+				bot.send_photo(photo=file_id, **pars)
+			elif ext == 'video':
+				bot.send_video(video=file_id, **pars)
+			elif ext == 'voice':
+				bot.send_voice(voice=file_id, **pars)
+			else:
+				print(f'Unsupported telegram id file {ext}')
 		elif filepath.endswith('.py'):
 			mess = filepath.replace('.py', '')
 			code = open(filepath, 'r').read()
@@ -132,6 +144,8 @@ class User:
 		from the file "/bin/rm"
 		"""
 		if message not in self.data['mess_to_file']:
+			# Calls are not supported on this file. ignore
+			print(f'Did not understand {message!r}')
 			return
 		# Check to what file is the reply referring to
 		file = self.data['mess_to_file'][message]
@@ -159,10 +173,11 @@ class User:
 			elif line.endswith('/'):
 				out.remove(line)
 				self.cd(line, bot)
-		if out:
-			out = '\n'.join(out)
+		if out and '\n'.join(out).strip():
+			out = '\n'.join(out).strip()
 			update.message.reply_text(out, parse_mode='HTML')
-		# Calls are not supported on this file. ignore
+			self.data['mess_to_file'][out] = file
+			self.save_data()
 		
 		
 	def run_bin(self, message, update, bot):
@@ -188,6 +203,34 @@ class User:
 		# in order to make it recognizable to User.call
 		self.data['mess_to_file'][script] = script
 		self.call(script, arguments, update, bot)
+
+
+	def download(self, message, file_id=None, text=''):
+		if message.text:
+			text = message.text
+		if message.caption:
+			text = message.caption
+		if message.audio:
+			file_id = message.audio.file_id
+			ext = 'audio' 
+		if message.document:
+			file_id = message.document.file_id
+			ext = 'document'
+		if message.photo:
+			file_id = message.photo[0].file_id
+			ext = 'photo'
+		if message.video:
+			file_id = message.video.file_id
+			ext = 'video'
+		if message.voice:
+			file_id = message.voice.file_id
+			ext = 'voice'
+		if file_id:
+			filename = f'{str(random.random())[1:]}.tgfile'
+			with open(os.path.join(self.data['path'], filename), 'w') as file:
+				file.write(f'{ext}@{file_id}')
+			text += f'\n{filename}'
+		return text
 				
 				
 def get_docstring(source):
@@ -236,16 +279,17 @@ def on_message(bot, update):
 	"""
 	print("Message received")
 	user = User(update.message.from_user)
+	text = user.download(update.message)
 	# Command, tell the user to execute it
-	if update.message.text.startswith('/'):
-		user.run_bin(update.message.text, update, bot)
+	if text.startswith('/'):
+		user.run_bin(text, update, bot)
 	# It's a call to an older message
 	elif update.message.reply_to_message:
 		user.call(update.message.reply_to_message.text, 
-			update.message.text, update, bot)
+			text, update, bot)
 	# What else? Just a directory name to open
 	else:
-		user.cd(update.message.text, bot)
+		user.cd(text, bot)
 	print("Message handled")
 
 

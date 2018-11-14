@@ -4,7 +4,7 @@ The main tytg module.
 
 import telegram.ext
 import argparse, logging
-import os.path, subprocess
+import os, os.path, subprocess
 import json, ast
 from glob import glob
 from telegram import ReplyKeyboardMarkup as RKM
@@ -137,14 +137,21 @@ class User:
 		file = self.data['mess_to_file'][message]
 		# Call the python file, and write the output back
 		if file.endswith('.py'):
-			cmd = f'python3 "{file}" "{args}"'
+			cmd = f'python3 "{os.path.abspath(file)}" "{args}"'
 		else:
 			return self.send(file, bot, {'chat_id': update.message.chat_id})
+		# Saves the current directory, in order to return to it
+		cwd = os.getcwd()
+		# Enter the path, to execute the script in the right directory
+		os.chdir(self.data['path'])
 		out = subprocess.check_output(cmd, shell=True)
 		out = out.decode().split('\n')
+		# Get back to the working directory
+		os.chdir(cwd)
 		for line in [*out]:
 			# If any line output is a filename, send it
-			if any(line.endswith(ext) for ext in self.extensions):
+			if any(line.endswith(ext) for ext in self.extensions) and \
+				os.path.exists(os.path.join(self.data['path'], line)):
 				out.remove(line)
 				line = os.path.join(self.data['path'], line)
 				self.send(line, bot, {'chat_id': update.message.chat_id})
@@ -155,7 +162,7 @@ class User:
 		if out:
 			out = '\n'.join(out)
 			update.message.reply_text(out, parse_mode='HTML')
-	# Calls are not supported on this file. ignore
+		# Calls are not supported on this file. ignore
 		
 		
 	def run_bin(self, message, update, bot):
